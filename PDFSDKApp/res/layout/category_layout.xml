@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content" >
+
+    <RelativeLayout
+        android:layout_width="fill_parent"
+        android:layout_height="49dp"
+        android:background="@color/colorActionBar" >
+
+        <RelativeLayout
+            android:id="@+id/relativeTabColor"
+            android:layout_width="6dp"
+            android:layout_height="fill_parent"
+            android:background="@color/colorActionBarText" >
+
+        </RelativeLayout>
+
+        <ImageView
+            android:id="@+id/imageIcon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_centerVertical="true"
+            android:layout_marginLeft="14dp"
+            android:src="@drawable/ic_launcher" />
+
+        <TextView
+            android:id="@+id/textCategory"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_marginLeft="58dp"
+            android:text="Medium Text"
+            android:textAppearance="?android:attr/textAppearanceMedium" />
+
+        <RelativeLayout
+            android:id="@+id/relativeBorder"
+            android:layout_width="fill_parent"
+            android:layout_height="1dp"
+            android:layout_alignParentBottom="false"
+            android:layout_marginTop="47dp"
+            android:background="@color/colorActionBarBorder" >
+
+        </RelativeLayout>
+
+    </RelativeLayout>
+
+</RelativeLayout>
+    

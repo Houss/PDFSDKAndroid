@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="text_color_default">#00000C</color>
+    <color name="text_color_inverse">#FFFFFF</color>
+    <color name="white">#FFFFFF</color>
+    <color name="list_row_default_bg">#ffffff</color>
+    <color name="list_row_pressed_bg">#008cef</color>
+    <color name="list_row_selected_bg">#86d3f6</color>
+	
+	        <color name="colorWhite">#ffffff</color>
+        <color name="colorBlack">#000000</color>
+        <color name="colorGray">#dededf</color>
+        <color name="colorActionBar">#dededf</color>
+        <color name="colorActionBarShadow">#d2d2d2</color>
+        <color name="colorActionBarBorder">#acacac</color>
+        <color name="colorActionBarText">#777777</color>
+	
+</resources>
