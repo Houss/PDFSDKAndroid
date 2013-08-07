@@ -3,9 +3,9 @@ PDF SDK for Android
 
 Add PDF viewer/reader support to your Android apps with this PDF SDK
 
-![image](https://www.dropbox.com/s/s9h7zj9q5gypdtq/pdf_logo.gif)
+![image](http://www.allappsmobile.com/PDF_SDK_for_Android/pdf_logo.gif)
 
-###You can purchase a license with the full source code at [Binpress](http://www.binpress.com/app/pdftouch-sdk-for-ios/859).
+###You can purchase a license with the full source code at [Binpress](http://www.binpress.com/).
 
 # Features
 
