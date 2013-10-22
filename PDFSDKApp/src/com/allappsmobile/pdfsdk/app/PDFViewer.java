@@ -1,62 +1,62 @@
 package com.allappsmobile.pdfsdk.app;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.ref.SoftReference;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+
+import javax.microedition.khronos.opengles.GL10;
 
 import net.sf.andpdf.nio.ByteBuffer;
 import net.sf.andpdf.refs.HardReference;
 
+import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Configuration;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.os.Debug.MemoryInfo;
 import android.support.v4.app.ActionBarDrawerToggle;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.widget.AdapterView;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.actionbarsherlock.app.SherlockActivity;
 import com.actionbarsherlock.view.Menu;
 import com.actionbarsherlock.view.MenuItem;
-
 import com.polites.android.GestureImageView; 
 import com.sun.pdfview.PDFFile;
 import com.sun.pdfview.PDFImage;
 import com.sun.pdfview.PDFPage;
 import com.sun.pdfview.PDFPaint;
-import com.sun.pdfview.decrypt.PDFAuthenticationFailureException;
-import com.sun.pdfview.decrypt.PDFPassword;
 import com.sun.pdfview.font.PDFFont;
 
 
 public class PDFViewer extends SherlockActivity 
 {
+	int actionBarHeight;
     private DrawerLayout mDrawerLayout;
     private ListView mDrawerList;
     private ActionBarDrawerToggle mDrawerToggle;
@@ -75,14 +75,15 @@ public class PDFViewer extends SherlockActivity
 	int currentPage = 1;
 	int pageCount;
 	
+	int w;
+	int h;
+	
+	double factor;
+	
 	boolean isTwo = false;
+	boolean landscape;
 	
 	private final static int DIALOG_PAGENUM = 1;
-	private final static int DIALOG_BOOKMARK = 2;
-	
-	DBAdapter data;
-	
-	private String pdffilename;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) 
@@ -91,7 +92,39 @@ public class PDFViewer extends SherlockActivity
 		setContentView(R.layout.activity_pdf_viewer);  
 		getSupportActionBar().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#DDDDDD")));
 		
-		data = new DBAdapter(this);
+		DisplayMetrics displaymetrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(displaymetrics);
+        int wwidth = displaymetrics.widthPixels;
+        int hheight = displaymetrics.heightPixels;
+        
+        TypedValue tv = new TypedValue();
+        if (getTheme().resolveAttribute(android.R.attr.actionBarSize, tv, true))
+        {
+            actionBarHeight = TypedValue.complexToDimensionPixelSize(tv.data,getResources().getDisplayMetrics());
+        }
+        
+        if(this.getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE){
+            landscape=true;
+            w=(int) (displaymetrics.heightPixels);
+            h=(int) ((displaymetrics.widthPixels-actionBarHeight));
+        }else{
+            landscape=false;
+            h=(int) ((displaymetrics.heightPixels-actionBarHeight));
+            w=(int) (displaymetrics.widthPixels);
+        } 
+        
+		Log.i("Cambio a Landscape --->", " " + landscape);
+		Log.i("w--->", " " + w);
+		Log.i("h--->", " " + h);
+        
+        if(w<h){
+        	factor = (Global.GLmaxSize+h)/2;
+            factor = factor/h;
+        }else{
+        	factor = (Global.GLmaxSize+w)/2;
+            factor = factor/w;
+        }
+
 		
 		Bundle extras = getIntent().getExtras();
 		if(extras !=null)
@@ -136,7 +169,7 @@ public class PDFViewer extends SherlockActivity
         categoryList.add(category07);
         
         categoryAdapter = new CategoryAdapter(PDFViewer.this,R.layout.drawer_list_item,categoryList);
-        mDrawerList.setAdapter(categoryAdapter); 
+        mDrawerList.setAdapter(categoryAdapter);
 
         mDrawerList.setOnItemClickListener(new DrawerItemClickListener());
 
@@ -171,17 +204,30 @@ public class PDFViewer extends SherlockActivity
         
         image.setImageDrawable(PDFViewer.this.getResources().getDrawable(R.drawable.ic_page_null));
         
-        setContent(null);
         
-       // file = getDocument(path+pdf);
+        file = getDocument(path+pdf);
         if(file==null)
         {
         	return;
         }
+        
+
         pageCount = file.getNumPages();
         showPage(currentPage,isTwo);
         
 	}
+	
+	@Override
+	public void onLowMemory() {
+	    super.onLowMemory();
+	    System.out.println("onLowMemory");
+	    // Your memory releasing code
+	}
+	
+/*	@Override
+	public void onPause(){
+	   // onCreate(new Bundle());
+	}*/
 	
 	public PDFFile getDocument(String getPath)
 	{
@@ -278,7 +324,6 @@ public class PDFViewer extends SherlockActivity
     			intentDirectory.putExtra("pdf",pdf);
     			intentDirectory.putExtra("currentPage",currentPage);
     			intentDirectory.putExtra("isTwo",isTwo);
-    			intentDirectory.putExtra("pageCount",pageCount);
     		    startActivity(intentDirectory);
             }
             
@@ -331,26 +376,20 @@ public class PDFViewer extends SherlockActivity
     	.setIcon(R.drawable.ic_next)
     	.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS); 
     	
-    	menu.add(0,3,3,"Add Bookmark")
-    	.setIcon(R.drawable.ic_add)
-    	.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS); 
-    	
     	return super.onCreateOptionsMenu(menu);
     }
     
     @Override
     public boolean onOptionsItemSelected(MenuItem item)
 	{
-    	if(item.getTitle().equals("Add Bookmark"))
-    	{
-    		showDialog(DIALOG_BOOKMARK);
-    	}
     	//currentPage
     	if(item.getTitle().equals("Previous"))
 		{
     		//bitmapGlobal.recycle();
         	if(isTwo)
         	{
+        		//image.setImageDrawable(PDFViewer.this.getResources().getDrawable(R.drawable.ic_page_null));
+        		//showPage(currentPage-2,isTwo);
 //        		if((currentPage>=1)&&(currentPage<=pageCount))
 //        		{
         			Intent intentDirectory=new Intent(PDFViewer.this,PDFViewer.class);
@@ -364,6 +403,8 @@ public class PDFViewer extends SherlockActivity
         	}
         	else
         	{
+        		//image.setImageDrawable(PDFViewer.this.getResources().getDrawable(R.drawable.ic_page_null));
+        		//showPage(currentPage-1,isTwo);
 //        		if((currentPage>=1)&&(currentPage<=pageCount))
 //        		{
         			Intent intentDirectory=new Intent(PDFViewer.this,PDFViewer.class);
@@ -382,6 +423,8 @@ public class PDFViewer extends SherlockActivity
     		//bitmapGlobal.recycle();
         	if(isTwo)
         	{
+        		//image.setImageDrawable(PDFViewer.this.getResources().getDrawable(R.drawable.ic_page_null));
+        		//showPage(currentPage+2,isTwo);
 //        		if((currentPage>=1)&&(currentPage<=pageCount))
 //        		{
         			Intent intentDirectory=new Intent(PDFViewer.this,PDFViewer.class);
@@ -395,6 +438,8 @@ public class PDFViewer extends SherlockActivity
         	}
         	else
         	{
+        		//image.setImageDrawable(PDFViewer.this.getResources().getDrawable(R.drawable.ic_page_null));
+        		//showPage(currentPage+1,isTwo);
 //        		if((currentPage>=1)&&(currentPage<=pageCount))
 //        		{
         			Intent intentDirectory=new Intent(PDFViewer.this,PDFViewer.class);
@@ -408,6 +453,17 @@ public class PDFViewer extends SherlockActivity
         	}
 		}
     	
+    	if(item.getTitle().equals("PDF SDK App"))
+        {
+            if (mDrawerList.getVisibility() == View.VISIBLE) {
+                // Its visible
+                mDrawerLayout.closeDrawers();
+            } else {
+                // Either gone or invisible
+                mDrawerLayout.openDrawer(mDrawerList);
+            }
+        }
+
 		return super.onOptionsItemSelected(item);
 	}
     
@@ -451,77 +507,78 @@ public class PDFViewer extends SherlockActivity
     	}
     	*/
     }
+
+    
+    Bitmap bitmapGlobal;
+    
     double setW,setH;
     public void renderOnePage(int Page)
     {
-    	try
-    	{
-    		filePage = file.getPage(Page, true);
     		
-    		if(filePage.getWidth()>900)
-    		{
-    			setW = filePage.getWidth();
-    			setH = filePage.getHeight();
-    		}
-    		else
-    		{
-    			if(filePage.getWidth()<400)
-        		{
-        			setW = filePage.getWidth()*2;
-        			setH = filePage.getHeight()*2;
-        		}
-    			else
-    			{
-        			setW = filePage.getWidth()*1.5;
-        			setH = filePage.getHeight()*1.5;
-    			}
-    		}
-    		
-    		
-    		//imagePage = filePage.getImage((int)filePage.getWidth(), (int)filePage.getHeight(), null, false, true);
-    		imagePage = filePage.getImage((int)setW, (int)setH, null, false, true);
-    		image.setImageBitmap(hasBookmark(imagePage,Page));
-    	//	image.setImageBitmap(imagePage);
-    	}
-    	catch(Exception ex)
-    	{
-    		
-    	}
+    	filePage = file.getPage(Page, true);
+
+		setW = w*factor;
+		setH = h*factor;  
+		
+		Log.i("fACTOR--->", " " + factor);
+		Log.i("w--->", " " + setW);
+		Log.i("h--->", " " + setH);
+		
+		System.gc();
+        if(bitmapGlobal != null) {
+        	bitmapGlobal.recycle();
+        	bitmapGlobal = null;
+       }
+
+   
+        
+        Log.i("DEBUG--->", " Start Render");
+        System.gc();
+		bitmapGlobal = filePage.getImage((int)setW, (int)setH, null, false, true);	
+        Log.i("DEBUG--->", " End Render");
+        
+        image.setImageBitmap(bitmapGlobal);
+        HardReference.cleanup();
+
+    	
     }
     
-    Bitmap bitmapGlobal;
+
     
     public void renderTwoPages(int Page) 
     {
     	try
-    	{
+    	{   
+    		Log.i("w--->", " " + w);
+    		Log.i("h--->", " " + h);
+    		
     		if(Page==1)
     		{
-        		filePage = file.getPage(Page, true);
+    			
+        		setW = w*(factor-.5);
+        		setH = h*(factor-.5);  
         		
-        		if(filePage.getWidth()>900)
-        		{
-        			setW = filePage.getWidth();
-        			setH = filePage.getHeight();
-        		}
-        		else
-        		{
-        			if(filePage.getWidth()<400)
-            		{
-            			setW = filePage.getWidth()*2;
-            			setH = filePage.getHeight()*2;
-            		}
-        			else
-        			{
-            			setW = filePage.getWidth()*1.5;
-            			setH = filePage.getHeight()*1.5;
-        			}
+        		PDFPage page = file.getPage(Page, true);
+        		
+        		double divideby = 2;
+        		if(landscape){
+        			divideby = 1.25;
         		}
         		
-        		//bitmapGlobal = page.getImage((int)page.getWidth(), (int)page.getHeight(), null, false, true);
-        		bitmapGlobal = filePage.getImage((int)setW, (int)setH, null, false, true);
-        		bitmapGlobal = hasBookmark(bitmapGlobal,Page);
-        		image.setImageBitmap(bitmapGlobal);
+        		System.gc();
+        		PDFPage pageRight = file.getPage(Page, true);
+        		System.gc();
+        		Bitmap bitmapRightPage = pageRight.getImage((int)(setW/divideby), (int)(setH/divideby), null, false, true);
+        		
+        		bitmapGlobal = Bitmap.createBitmap((int)(bitmapRightPage.getWidth()*2), (int)(bitmapRightPage.getHeight()), Bitmap.Config.ARGB_8888); 
+        		Canvas comboImage = new Canvas(bitmapGlobal); 
+   
+        		comboImage.drawBitmap(bitmapRightPage, bitmapRightPage.getWidth(), 0f , null); 
+                image.setImageBitmap(bitmapGlobal);
+                HardReference.cleanup();
+
+                bitmapRightPage.recycle();
+
     		}
     		else
     		{
@@ -529,10 +586,12 @@ public class PDFViewer extends SherlockActivity
     			if(isPair(Page))
     			{
     				image.setImageBitmap(fromLeftToRight(Page));
+    				HardReference.cleanup();
     			}
     			else
     			{
     				image.setImageBitmap(fromRightToLeft(Page));
+    				HardReference.cleanup();
     			}
     		}
     	}
@@ -543,23 +602,28 @@ public class PDFViewer extends SherlockActivity
     {
     	try
     	{
+    		Log.i("DEBUG--->", " Left to Right");
+    		
+    		setW = w*(factor-.5);
+    		setH = h*(factor-.5);  
+
+    		double divideby = 2;
+    		if(landscape){
+    			divideby = 1.25;
+    		}
+    		
     		// Get left page and add next right page
     		PDFPage pageLeft = file.getPage(Page, true);
-    		Bitmap bitmapLeftPage = pageLeft.getImage((int)pageLeft.getWidth(), (int)pageLeft.getHeight(), null, false, true);
-    		bitmapLeftPage = hasBookmark(bitmapLeftPage,Page);
+    		//Bitmap bitmapLeftPage = pageLeft.getImage((int)w, (int)h, null, false, true);
+    		Bitmap bitmapLeftPage = pageLeft.getImage((int)(setW/divideby), (int)(setH/divideby), null, false, true);
     		
     		int nextPage = Page+1;
     		PDFPage pageRight = file.getPage(nextPage, true); 
-    		Bitmap bitmapRightPage = pageRight.getImage((int)pageRight.getWidth(), (int)pageRight.getHeight(), null, false, true);
-    		bitmapRightPage = hasBookmark(bitmapRightPage,nextPage);
-    		
-    		
-    		int width, height; 
-    		
-    		width  = bitmapLeftPage.getWidth() + bitmapRightPage.getWidth(); 
-    		height = bitmapRightPage.getHeight(); 
-    		
-    		bitmapGlobal = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888); 
+    		//Bitmap bitmapRightPage = pageRight.getImage((int)w, (int)h, null, false, true);
+    		Bitmap bitmapRightPage = pageRight.getImage((int)(setW/divideby), (int)(setH/divideby), null, false, true);
+
+   		
+    		bitmapGlobal = Bitmap.createBitmap((int)(bitmapRightPage.getWidth()*2), (int)(bitmapRightPage.getHeight()), Bitmap.Config.ARGB_8888); 
     		Canvas comboImage = new Canvas(bitmapGlobal); 
     		
             comboImage.drawBitmap(bitmapLeftPage, 0f, 0f, null); 
@@ -580,22 +644,30 @@ public class PDFViewer extends SherlockActivity
     {
     	try
     	{
+    		
+    		Log.i("DEBUG--->", " Right to Left -Page->" + Page);
+  
+    		setW = w*(factor-.5);
+    		setH = h*(factor-.5);  
+ 
+    		double divideby = 2;
+    		if(landscape){
+    			divideby = 1.25;
+    		}
+    		
+    		
     		// Get left page and add next right page
     		int previousPage = Page-1;
     		PDFPage pageLeft = file.getPage(previousPage, true);
-    		Bitmap bitmapLeftPage = pageLeft.getImage((int)pageLeft.getWidth(), (int)pageLeft.getHeight(), null, false, true);
-    		bitmapLeftPage = hasBookmark(bitmapLeftPage,previousPage);
+    		//Bitmap bitmapLeftPage = pageLeft.getImage((int)w, (int)h, null, false, true);
+    		Bitmap bitmapLeftPage = pageLeft.getImage((int)(setW/divideby), (int)(setH/divideby), null, false, true);
     		
     		PDFPage pageRight = file.getPage(Page, true);
-    		Bitmap bitmapRightPage = pageRight.getImage((int)pageRight.getWidth(), (int)pageRight.getHeight(), null, false, true);
-    		bitmapRightPage = hasBookmark(bitmapRightPage,Page);
+    		//Bitmap bitmapRightPage = pageRight.getImage((int)w, (int)h, null, false, true);
+    		Bitmap bitmapRightPage = pageRight.getImage((int)(setW/divideby), (int)(setH/divideby), null, false, true);
     		
-    		int width, height; 
     		
-    		width  = bitmapLeftPage.getWidth() + bitmapRightPage.getWidth(); 
-    		height = bitmapRightPage.getHeight(); 
-    		
-    		bitmapGlobal = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888); 
+    		bitmapGlobal = Bitmap.createBitmap((int)(bitmapRightPage.getWidth()*2), (int)(bitmapRightPage.getHeight()), Bitmap.Config.ARGB_8888); 
     		Canvas comboImage = new Canvas(bitmapGlobal); 
     		
             comboImage.drawBitmap(bitmapLeftPage, 0f, 0f, null); 
@@ -624,52 +696,6 @@ public class PDFViewer extends SherlockActivity
     		return false;
     	}
     }
-    
-    //Bitmap icon = BitmapFactory.decodeResource(context.getResources(),R.drawable.icon_resource);
-    
-    public Bitmap hasBookmark(Bitmap getPageBitmap,int page)
-    {
-    	try
-    	{
-    		data.openToRead();
-    		boolean isBookmark = data.hasBookmarkPage(page, pdf, pageCount);
-    		Log.i("hasBookmark","isBookmark = " + isBookmark);
-    		
-    		Bitmap pageBookmark = null;
-    		Bitmap flagOn = BitmapFactory.decodeResource(PDFViewer.this.getResources(), R.drawable.ic_flag_on);
-    		Bitmap flagOff = BitmapFactory.decodeResource(PDFViewer.this.getResources(), R.drawable.ic_flag_off);
-    		
-    		if(isBookmark)
-    		{
-    			pageBookmark = Bitmap.createBitmap(getPageBitmap.getWidth(), getPageBitmap.getHeight(),Bitmap.Config.ARGB_8888); 
-    			Canvas canvas = new Canvas(pageBookmark);
-    			canvas.drawBitmap(getPageBitmap, new Matrix(), null);
-    			canvas.drawBitmap(flagOn, 10,0, null);
-    			return pageBookmark;
-    			
-    		}
-    		else
-    		{
-    			pageBookmark = Bitmap.createBitmap(getPageBitmap.getWidth(), getPageBitmap.getHeight(),Bitmap.Config.ARGB_8888); 
-    			Canvas canvas = new Canvas(pageBookmark);
-    			canvas.drawBitmap(getPageBitmap, new Matrix(), null);
-    			canvas.drawBitmap(flagOff, 10,0, null);
-    			return pageBookmark;
-    		}
-    	}
-    	catch(Exception ex)
-    	{
-    		return getPageBitmap;
-    	}
-    	finally
-    	{
-    		data.close(); 
-    	}
-    }
-    
-    int savePage;
-    String saveText;
-	int pageA,pageB;
     
     @Override
     protected Dialog onCreateDialog(int id) 
@@ -715,255 +741,8 @@ public class PDFViewer extends SherlockActivity
 	                }
 	            })
 	            .create();
-    		case DIALOG_BOOKMARK:
-    			LayoutInflater factorys = LayoutInflater.from(this);
-    			final View viewAddBookmark = factorys.inflate(R.layout.layoud_add_bookmark, null);
-    			final RadioGroup radioGroup = (RadioGroup)viewAddBookmark.findViewById(R.id.radioGroup);
-    			final EditText editBookmark  = (EditText)viewAddBookmark.findViewById(R.id.editBookmark);
-    			final RadioButton radio0  = (RadioButton)viewAddBookmark.findViewById(R.id.radio0);
-    			final RadioButton radio1  = (RadioButton)viewAddBookmark.findViewById(R.id.radio1);
-    			
-    			final int setPageA,setPageB;
-    			
-    			if(isTwo)
-    			{
-    				if(currentPage<pageCount) 
-    				{
-    					setPageA = currentPage;
-    					setPageB = (currentPage+1);
-    					
-    					radio0.setText("Page "+setPageA);
-    					radio1.setText("Page "+setPageB); 
-    					radio1.setVisibility(View.VISIBLE);
-    				}
-    				else
-    				{
-    					setPageA = currentPage;
-    					setPageB = 0;
-    					radio0.setText("Page "+setPageA);
-    					radio1.setVisibility(View.GONE);
-    				}
-    			}
-    			else
-    			{
-    				setPageA = currentPage;
-    				setPageB = 0;
-    				radio0.setText("Page "+setPageA);
-    				radio1.setVisibility(View.GONE);
-    			}
-    			
-
-    			
-
-
-    			return new AlertDialog.Builder(this)
-    			.setTitle("Add bookmark")
-    			.setView(viewAddBookmark)
-    			.setPositiveButton("Add", new DialogInterface.OnClickListener()
-    			{
-    				public void onClick(DialogInterface dialog, int whichButton)
-    				{
-    					if(editBookmark.length()==0)
-    					{
-    			    		Toast.makeText(PDFViewer.this, "Capture bookmark", Toast.LENGTH_SHORT).show();
-    			    		return;
-    					}
-    					else
-    					{
-    						saveText = editBookmark.getText().toString();
-    					}
-    					
-    					if(radio1.isShown())
-    					{
-    						if(radio0.isChecked())
-    						{
-    							savePage = setPageA;
-    						}
-    						if(radio1.isChecked())
-    						{
-    							savePage = setPageB;
-    						}
-    					}
-    					else
-    					{
-    						savePage = setPageA;
-    					}
-
-    					Log.i("bookmark","savePage = " + savePage);
-    					Log.i("bookmark","saveText = " + saveText);
-    					
-    					insertBookmark(saveText,savePage);
-    	            	editBookmark.setText("");
-    				}
-    			})
-    			.setNegativeButton("Cancel", new DialogInterface.OnClickListener() 
-    			{
-                    public void onClick(DialogInterface dialog, int whichButton) 
-                    {
-                    	editBookmark.setText("");
-                    }
-                })
-                .create();
     	}
     	return null;
-    }
-    
-	public void insertBookmark(String text,int page)
-	{
-		try
-		{
-			String setPage = String.valueOf(page);
-			String new_id = nextID();
-			
-			data.open();
-			long id;
-			id = data.insertBookmark(new_id, text, setPage, pdf, String.valueOf(pageCount));
-            if(id == -1)
-            {
-            	Toast.makeText(PDFViewer.this, "Error", Toast.LENGTH_SHORT).show();
-            }
-            else
-            {  
-            	Toast.makeText(PDFViewer.this, "Saved", Toast.LENGTH_SHORT).show();
-            	//loadBookmarks();
-            	if(isTwo)
-            	{
-            			Intent intentDirectory=new Intent(PDFViewer.this,PDFViewer.class);
-            			intentDirectory.putExtra("path",path);
-            			intentDirectory.putExtra("pdf",pdf);
-            			intentDirectory.putExtra("currentPage",currentPage);
-            			intentDirectory.putExtra("isTwo",isTwo);
-            		    startActivity(intentDirectory);
-            	}
-            	else
-            	{
-            			Intent intentDirectory=new Intent(PDFViewer.this,PDFViewer.class);
-            			intentDirectory.putExtra("path",path);
-            			intentDirectory.putExtra("pdf",pdf);
-            			intentDirectory.putExtra("currentPage",currentPage);
-            			intentDirectory.putExtra("isTwo",isTwo);
-            		    startActivity(intentDirectory);
-            	}
-            }
-			
-		}
-		catch(Exception ex)
-		{
-    		Toast.makeText(PDFViewer.this, "Error " + ex.getMessage(), Toast.LENGTH_SHORT).show();
-    		return;
-		}
-		finally
-		{
-			data.close();
-		}
-	}
-	
-	public String nextID()
-	{
-		Cursor c = null;
-		try
-		{
-			data.openToRead();
-			c = data.getNextIDBookmark(pdf, String.valueOf(pageCount));
-			if(c.getCount()>0)
-			{
-				if(c.moveToFirst())
-				{
-					String id_old = c.getString(0);
-					int parse = Integer.parseInt(id_old);
-					parse++;
-					String new_id = String.valueOf(parse);
-					Log.i("nextID","new_id = " + new_id);
-					return new_id;
-				}
-				else
-				{
-					return "1";
-				}
-			}
-			else
-			{
-				return "1";
-			}
-			
-		}
-		catch(Exception ex)
-		{
-			return null;
-		}
-		finally
-		{
-			data.close();
-		}
-	}
-	
-	private void setContent(String password) {
-        try { 
-        	String setName = path+pdf;
-    		parsePDF(setName, password);
-
-    	}
-        catch (PDFAuthenticationFailureException e) {
-        	setContentView(R.layout.pdf_file_password);
-           	final EditText etPW= (EditText) findViewById(R.id.etPassword);
-           	Button btOK= (Button) findViewById(R.id.btOK);
-        	Button btExit = (Button) findViewById(R.id.btExit);
-            btOK.setOnClickListener(new OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					String pw = etPW.getText().toString();
-		        	setContent(pw);
-				}
-			});
-            btExit.setOnClickListener(new OnClickListener() {
-				@Override
-				public void onClick(View v) {
-				//	finish();
-				}
-			});
-        }
-	}
-	
-    private void parsePDF(String filename, String password) throws PDFAuthenticationFailureException {
-        long startTime = System.currentTimeMillis();
-    	try {
-        	File f = new File(filename);
-        	long len = f.length();
-        	if (len == 0) {
-        		//mGraphView.showText("file '" + filename + "' not found");
-        	}
-        	else {
-        		//mGraphView.showText("file '" + filename + "' has " + len + " bytes");
-    	    	openFile(f, password);
-        	}
-    	}
-        catch (PDFAuthenticationFailureException e) {
-        	throw e; 
-		} catch (Throwable e) {
-			e.printStackTrace();
-			//mGraphView.showText("Exception: "+e.getMessage());
-		}
-        long stopTime = System.currentTimeMillis();
-       // mGraphView.fileMillis = stopTime-startTime;
-	}
-    
-    public void openFile(File files, String password) throws IOException {
-        // first open the file for random access
-        RandomAccessFile raf = new RandomAccessFile(files, "r");
-
-        // extract a file channel
-        FileChannel channel = raf.getChannel();
-
-        // now memory-map a byte-buffer
-        ByteBuffer bb =
-                ByteBuffer.NEW(channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size()));
-        // create a PDFFile from the data
-        if (password == null)
-        	file = new PDFFile(bb);
-        else
-        	file = new PDFFile(bb, new PDFPassword(password));
-	        
-       // mGraphView.showText("Anzahl Seiten:" + mPdfFile.getNumPages());
     }
     
 }
